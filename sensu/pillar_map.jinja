@@ -1,5 +1,9 @@
 {% set sensu = salt['grains.filter_by']({
     'default': {
+        'transport': {
+            'name': 'rabbitmq',
+            'reconnect_on_error': 'true',
+        },
         'client': {
             'embedded_ruby': False,
             'nagios_plugins': False,
@@ -26,6 +30,9 @@
             'vhost': '/sensu',
             'user': 'sensu',
             'password': ''
+        },
+        'server': {
+            'embedded_ruby': False,
         },
         'ssl': {
             'enable': False
@@ -63,13 +70,14 @@
             }
         ],
         'paths': {
-            'plugins'       : 'sensu/files/plugins',
-            'conf_d'        : 'sensu/files/conf.d',
-            'extensions'    : 'sensu/files/extensions',
-            'mutators'      : 'sensu/files/mutators',
-            'handlers'      : 'sensu/files/handlers',
-            'checks_file'   : '/etc/sensu/conf.d/checks.json',
-            'handlers_file' : '/etc/sensu/conf.d/handlers.json',
+            'plugins'                : 'sensu/files/plugins',
+            'conf_d'                 : 'sensu/files/conf.d',
+            'extensions'             : 'sensu/files/extensions',
+            'mutators'               : 'sensu/files/mutators',
+            'handlers'               : 'sensu/files/handlers',
+            'checks_file'            : '/etc/sensu/conf.d/checks.json',
+            'standalone_checks_file' : '/etc/sensu/conf.d/standalone_checks.json',
+            'handlers_file'          : '/etc/sensu/conf.d/handlers.json',
         },
     },
 }, merge=salt['pillar.get']('sensu'), default='default') %}

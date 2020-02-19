@@ -6,7 +6,7 @@ A saltstack formula to install and configure the open source monitoring framewor
 >Note:
 See the full [Salt Formulas installation and usage instructions](http://docs.saltstack.com/en/latest/topics/development/conventions/formulas.html). This formula only manages Sensu. You are responsible for installing/configuring RabbitMQ and Redis as appropriate.
 
-Sensu can be configured/scaled with the individual states installed on multiple servers. All states are configured via the pillar file. Sane defaults are set in pillar_map.jinja and can be over-written in the pillar. The `sensu.client` state currently supports Ubuntu, CentOS and Windows. The `sensu.server`, `sensu.api` and `sensu.uchiwa` states currently support Ubuntu and CentOS. 
+Sensu can be configured/scaled with the individual states installed on multiple servers. All states are configured via the pillar file. Sane defaults are set in pillar_map.jinja and can be over-written in the pillar. The `sensu.client` state currently supports Ubuntu, CentOS and Windows. The `sensu.server`, `sensu.api` and `sensu.uchiwa` states currently support Ubuntu and CentOS.
 
 Thank you to the SaltStack community for the continued improvement of this formula!
 
@@ -50,6 +50,29 @@ Backward incompatible changes
 ------------
 
 Adds the Sensu repository, and installs the Sensu package.
+
+Allows the configuration of alternative repositories (i.e. mirrors) using the following syntax:
+```
+## for ubuntu
+sensu:
+  lookup:
+    repos:
+      name: deb http://mysensumirror.org/apt/sensu sensu main
+      key_url: http://mysensumirror.org/apt/sensu/key.gpg
+
+## or for RedHat
+sensu:
+  lookup:
+    repos:
+      baseurl: http://mysensumirror.org/yum/el/$releasever/$basearch/
+
+## or if you don't want the formula to handle the repo for you...
+sensu:
+  lookup:
+    repos:
+      enabled: False
+```
+
 
 ``sensu.server``
 ------------
@@ -96,12 +119,15 @@ Configures sensu-client and starts the service.
 
 Check scripts can be deployed to all clients by placing them into ./sensu/files/plugins.
 
-You can use the embedded ruby or installing nagios plugins by setting:
+You can use the embedded ruby, set a proxy or mirror for installing gems, or install nagios plugins by setting:
 ```
 sensu:
   client:
     embedded_ruby: true
     nagios_plugins: true
+    gem_source: http://gemmirror.example.com:9292
+    # or
+    gem_proxy: http://squid.example.com:3128
 ```
 
 To subscribe your clients to the appropriate checks, you can update the `sensu` pillar with the required subscriptions.  You can also override the client address to another interface or change the name of the client.  In addition, you can also enable Sensu's safe mode (highly recommended, off by default).
@@ -124,6 +150,17 @@ sensu:
         warning: 97
         critical: 99
 ```
+
+If you would like to use the [redact](https://sensuapp.org/docs/latest/clients) feature in your checks you can add a section under client as shown here:
+
+```
+sensu:
+  client:
+    redact:
+      - password
+```
+
+This will redact any command token value who's key is defined as "password" from check configurations and logs. Command token substitution should be used in check configurations when redacting sensitive information such as passwords.
 
 If you are adding plugins/checks which have additional gem dependencies. You can add them to the pillar data and they will be installed on your Sensu clients.
 ```

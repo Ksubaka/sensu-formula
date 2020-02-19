@@ -21,6 +21,24 @@ sensu_enable_windows_service:
     - name: 'sc create sensu-client start= delayed-auto binPath= c:\opt\sensu\bin\sensu-client.exe DisplayName= "Sensu Client"'
     - unless: 'sc query sensu-client'
 {% endif %}
+
+{%- if salt['pillar.get']('sensu:standalone_checks') %}
+sensu_standalone_checks_file:
+  file.serialize:
+    - name: {{ sensu.paths.standalone_checks_file }}
+    - dataset:
+        checks: {{ salt['pillar.get']('sensu:standalone_checks') }}
+    - formatter: json
+    - require:
+      - pkg: sensu
+    - watch_in:
+      - service: sensu-client
+{%- else %}
+sensu_standalone_checks_file:
+  file.absent:
+    - name: {{ sensu.paths.standalone_checks_file }}
+{%- endif %}
+
 /etc/sensu/conf.d/client.json:
   file.serialize:
     - formatter: json
@@ -37,9 +55,20 @@ sensu_enable_windows_service:
           subscriptions: {{ sensu.client.subscriptions }}
           safe_mode: {{ sensu.client.safe_mode }}
           <<: {{ sensu.client.custom_attributes|yaml }}
-{% if sensu.client.get("command_tokens") %}
+          {% if sensu.client.get('keepalive') %}
+          keepalive: {{ sensu.client.keepalive }}
+          {% endif %}
+          {% if sensu.client.get("command_tokens") %}
           command_tokens: {{ sensu.client.command_tokens }}
-{% endif %}
+          {% endif %}
+          {% if sensu.client.get("redact") %}
+          redact: {{ sensu.client.redact }}
+          {% endif %}
+          {% if sensu.client.get("override_attributes") %}
+          {% for attribute, values in sensu.client.override_attributes.items() %}
+          {{ attribute }}: {{ values|json }}
+          {% endfor %}
+          {% endif %}
     - require:
       - pkg: sensu
 
@@ -55,15 +84,6 @@ sensu_enable_windows_service:
       - service: sensu-client
     - watch_in:
       - service: sensu-client
-
-sensu-client:
-  service.running:
-    - enable: True
-    - require:
-      - file: /etc/sensu/conf.d/client.json
-      - file: /etc/sensu/conf.d/rabbitmq.json
-    - watch:
-      - file: /etc/sensu/conf.d/*
 
 {% if grains['os_family'] != 'Windows' %}
 /etc/default/sensu:
@@ -89,14 +109,31 @@ sensu-client:
 
 {% set gem_list = salt['pillar.get']('sensu:client:install_gems', []) %}
 {% for gem in gem_list %}
-install_{{ gem }}:
+{% if gem is mapping %}
+{% set gem_name = gem.name %}
+{% else %}
+{% set gem_name = gem %}
+{% endif %}
+install_{{ gem_name }}:
   gem.installed:
-    - name: {{ gem }}
+    - name: {{ gem_name }}
     {% if sensu.client.embedded_ruby %}
     - gem_bin: /opt/sensu/embedded/bin/gem
-    {% else %}
-    - gem_bin: None
+    {% endif %}
+    {% if gem.version is defined %}
+    - version: {{ gem.version }}
     {% endif %}
     - rdoc: False
     - ri: False
+    - proxy: {{ salt['pillar.get']('sensu:client:gem_proxy') }}
+    - source: {{ salt['pillar.get']('sensu:client:gem_source') }}
 {% endfor %}
+
+sensu-client:
+  service.running:
+    - enable: True
+    - require:
+      - file: /etc/sensu/conf.d/client.json
+      - file: /etc/sensu/conf.d/rabbitmq.json
+    - watch:
+      - file: /etc/sensu/conf.d/*

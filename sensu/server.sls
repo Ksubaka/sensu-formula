@@ -16,8 +16,7 @@ include:
       - service: sensu-server
 
 {%- if salt['pillar.get']('sensu:checks') %}
-
-sensu_checks_file:
+sensu_subscription_checks_file:
   file.serialize:
     - name: {{ sensu.paths.checks_file }}
     - dataset:
@@ -27,7 +26,10 @@ sensu_checks_file:
       - pkg: sensu
     - watch_in:
       - service: sensu-server
-
+{%- else %}
+sensu_subscription_checks_file:
+  file.absent:
+    - name: {{ sensu.paths.checks_file }}
 {%- endif %}
 
 {%- if salt['pillar.get']('sensu:handlers') %}
@@ -36,7 +38,7 @@ sensu_handlers_file:
   file.serialize:
     - name: {{ sensu.paths.handlers_file }}
     - dataset_pillar: sensu:handlers
-    - formatter: JSON
+    - formatter: json
     - require:
       - pkg: sensu
     - watch_in:
@@ -52,7 +54,7 @@ sensu_handlers_file:
       - pkg: sensu
     - watch_in:
       - service: sensu-server
-   
+
 /etc/sensu/mutators:
   file.recurse:
     - source: salt://{{ sensu.paths.mutators }}
@@ -75,12 +77,24 @@ sensu_handlers_file:
 
 {% set gem_list = salt['pillar.get']('sensu:server:install_gems', []) %}
 {% for gem in gem_list %}
-install_{{ gem }}:
+{% if gem is mapping %}
+{% set gem_name = gem.name %}
+{% else %}
+{% set gem_name = gem %}
+{% endif %}
+install_{{ gem_name }}:
   gem.installed:
-    - name: {{ gem }}
+    - name: {{ gem_name }}
+    {% if sensu.server.embedded_ruby %}
     - gem_bin: /opt/sensu/embedded/bin/gem
+    {% endif %}
+    {% if gem.version is defined %}
+    - version: {{ gem.version }}
+    {% endif %}
     - rdoc: False
     - ri: False
+    - proxy: {{ salt['pillar.get']('sensu:server:gem_proxy') }}
+    - source: {{ salt['pillar.get']('sensu:server:gem_source') }}
 {% endfor %}
 
 sensu-server:

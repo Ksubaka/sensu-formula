@@ -1,11 +1,20 @@
 sensu:
+  lookup:
+    repos:
+      name: deb http://repositories.sensuapp.org/apt sensu main
+      key_url: http://repositories.sensuapp.org/apt/pubkey.gpg
   server:
     install_gems:
       - mail
       - timeout
+      - name: aws-sdk
+        version: 2.2.6
   client:
     embedded_ruby: true
     nagios_plugins: true
+    redact:
+      - password
+    gem_proxy: http://192.168.1.1:3128/
   rabbitmq:
     host: 10.0.0.1
     user: sensu

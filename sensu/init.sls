@@ -1,22 +1,37 @@
+{% from "sensu/repos_map.jinja" import repos with context -%}
+
 {% if grains['os_family'] == 'Debian' %}
-python-apt:
-  pkg:
-    - installed
+sensu-extra-packages:
+  pkg.installed:
+    - names:
+      - python-apt
+      {% if repos.get('enabled') and repos.get('name').startswith("https") %}
+      - apt-transport-https
+      {% endif %}
     - require_in:
       - pkgrepo: sensu
 {% endif %}
 
+{% if grains['os_family'] == 'RedHat' %}
+/etc/yum/vars/osmajorrelease:
+  file.managed:
+    - source: salt://sensu/files/yum/osmajorrelease.template
+    - template: jinja
+{% endif %}
+
 sensu:
-  {% if grains['os_family'] != 'Windows' %}
+  {% if repos.get('enabled') %}
   pkgrepo.managed:
     - humanname: Sensu Repository
     {% if grains['os_family'] == 'Debian' %}
-    - name: deb http://repositories.sensuapp.org/apt sensu main
+    - name: {{ repos.get('name') }}
     - file: /etc/apt/sources.list.d/sensu.list
-    - key_url: http://repositories.sensuapp.org/apt/pubkey.gpg
-    {% elif grains['os_family'] == 'RedHat' %}
-    - baseurl: http://sensu.global.ssl.fastly.net/yum/$basearch/
-    - gpgcheck: 0
+    {%- if repos.get('key_url') %}
+    - key_url: {{ repos.get('key_url') }}
+    {%- endif %}
+    {%- elif grains['os_family'] == 'RedHat' %}
+    - baseurl: {{ repos.get('baseurl') }}
+    - gpgcheck: {{ repos.get('gpgcheck') }}
     - enabled: 1
     {% endif %}
     - require_in:
@@ -24,7 +39,6 @@ sensu:
   {% endif %}
   pkg:
     - installed
-
 
 {% if grains['os_family'] != 'Windows' %}
 old sensu repository:
